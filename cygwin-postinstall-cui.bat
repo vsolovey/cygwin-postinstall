@@ -61,7 +61,7 @@ echo cygwin root: %LOCAL_CYGWIN%
 
 rem название ОС. От ОС зависит, в частности, вывод недокоманды reg.
 rem set OS_NAME=7
-FOR /F "tokens=5" %%i IN ('systeminfo ^| findstr /R /C:"Microsoft Windows"') DO SET OS_NAME=%%i
+FOR /F "tokens=5" %%i IN ('systeminfo 2^>Nul ^| findstr /R /C:"Microsoft Windows"') DO SET OS_NAME=%%i
 echo Windows Name: %OS_NAME%
 
 rem количество пропускаемых строк в выводе недокоманды reg.
