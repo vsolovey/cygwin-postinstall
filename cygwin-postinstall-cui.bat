@@ -9,23 +9,30 @@ SET OS_NAME=
 SET REG_SKIP=
 SET REG_VAL=
 
-SET BEGIN_DESCR=Послеустановочная настройка Cygwin. Изменения затронут только текущего пользователя. В скрипт можно передать путь к директории cygwin: "%0 c:\dir"
+SET BEGIN_TITLE=0. Послеустановочная настройка Cygwin.
+SET BEGIN_DESCR=Изменения затронут только текущего пользователя. В скрипт можно передать путь к директории cygwin: "%0 c:\dir"
 SET BEGIN="Действия: [R]Запустить настройку, [C]Отменить: "
 
+SET CYG_TITLE=1. Директория установки cygwin.
 SET CYG_DESCR=Отсутствует путь к cygwin. Добавьте его, или будет использовано значение по умолчанию "%LOCAL_CYGWIN%".
 SET CYG_MK_PATH="Путь к cygwin: "
 SET CYG_MK="Действия: [A]Добавить, [S]Пропустить: "
 
+SET OS_TITLE=-- Получение версии ОС.
+
+SET ENV_TITLE=2. Переменная PATH для cygwin.
 SET ENV_DESCR=Добавление исполнимых файлов в путь поиска.
 SET ENV_WARN1=В системе есть файлы UNIX-окружения. Добавление Cygwin приведёт к конфликтам
 SET ENV_WARN2=Похоже, что пути уже прописаны.
 SET ENV_MK="Действия: [A]Добавить, [S]Пропустить: "
 
+SET HOME_TITLE=3. Домашняя директория.
 SET HOME_DESCR=Добавить %USERPROFILE% в качестве домашней директории.
 SET HOME_WARN1=Домашняя директория уже существует.
 SET HOME_MK="Действия: [A]Добавить, [S]Пропустить: "
 SET HOME_MK1="Действия: [D]Удалить и пересоздать, [R]Переименовать и создать, [S]Пропустить: "
 
+SET MNT_TITLE=4. Логические диски.
 SET MNT_DESCR=Завести ссылки в /mnt для логических дисков
 SET MNT_MK="Действия: Для [E]существующих, Для [A]всех букв алфавита, [S]Пропустить: "
 
@@ -33,6 +40,7 @@ SET MNT_MK="Действия: Для [E]существующих, Для [A]всех букв алфавита, [S]Пропуст
 rem ------------------------------------
 rem  command line options
 
+echo %BEGIN_TITLE%
 echo %BEGIN_DESCR%
 rem ------------------------------------
 :begin
@@ -47,6 +55,7 @@ rem положение cygwin. Если не задано в командной строке, то берётся значение по 
 IF NOT "x%1"=="x" (
 	SET LOCAL_CYGWIN=%1
 ) ELSE (
+	echo %CYG_TITLE%
 	echo %CYG_DESCR%
 	:begin_cyg
 	echo choice: %choice%
@@ -58,9 +67,12 @@ IF NOT "x%1"=="x" (
 )
 :end_cyg
 echo cygwin root: %LOCAL_CYGWIN%
+rem ------------------------------------
 
+rem ------------------------------------
 rem название ОС. От ОС зависит, в частности, вывод недокоманды reg.
 rem set OS_NAME=7
+echo %OS_TITLE%
 FOR /F "tokens=5" %%i IN ('systeminfo 2^>Nul ^| findstr /R /C:"Microsoft Windows"') DO SET OS_NAME=%%i
 echo Windows Name: %OS_NAME%
 
@@ -77,6 +89,7 @@ rem ------------------------------------
 rem ------------------------------------
 rem добавление cygwin в путь
 
+echo %ENV_TITLE%
 echo %ENV_DESCR%
 :begin_env
 SET /P choice=%ENV_MK%
@@ -103,12 +116,15 @@ IF "x%REG_VAL%"=="x" (
 
 	reg add HKCU\Environment /v CYGWIN_HOME /t REG_EXPAND_SZ /d %LOCAL_CYGWIN% >Nul
 	echo CYGWIN_HOME создана
+	
+	reg add HKCU\Environment /v CYGWIN_PATH /t REG_EXPAND_SZ /d %%CYGWIN_HOME%%\bin;%%CYGWIN_HOME%%\usr\local\bin;%%CYGWIN_HOME%%\usr\ssl\certs >Nul
+	echo CYGWIN_PATH создана
 
 	FOR /f "skip=2 tokens=2*" %%i IN ('reg query HKCU\Environment /v PATH 2^>Nul') DO SET REG_VAL=%%j
 	IF "x!REG_VAL!"=="x" (
-		reg add HKCU\Environment /v PATH /t REG_EXPAND_SZ /d %%CYGWIN_HOME%%\bin /f >Nul
+		reg add HKCU\Environment /v PATH /t REG_EXPAND_SZ /d %%CYGWIN_PATH%% /f >Nul
 	) ELSE (
-		reg add HKCU\Environment /v PATH /t REG_EXPAND_SZ /d !REG_VAL!;%%CYGWIN_HOME%%\bin /f >Nul
+		reg add HKCU\Environment /v PATH /t REG_EXPAND_SZ /d !REG_VAL!;%%CYGWIN_PATH%% /f >Nul
 	)
 	echo пути прописаны
 
@@ -131,6 +147,7 @@ set HOME=%USERPROFILE%
 
 rem ------------------------------------
 rem добавление домашней директории в /home
+echo %HOME_TITLE%
 echo %HOME_DESCR%
 :begin_home
 SET /P choice=%HOME_MK%
@@ -167,6 +184,7 @@ rem ------------------------------------
 
 rem ------------------------------------
 rem добавить ссылки на диски в /mnt
+echo %MNT_TITLE%
 echo %MNT_DESCR%
 :begin_mnt
 SET /P choice=%MNT_MK%
