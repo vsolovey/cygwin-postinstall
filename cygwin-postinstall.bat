@@ -40,7 +40,7 @@ for /f "tokens=2 delims=[]" %%x in ('ver') do set WINVER=%%x
 set WINVER=%WINVER:Version =%
 echo WINVER: %WINVER%
 
-FOR /F "tokens=5" %%i IN ('systeminfo ^| findstr /R /C:"Microsoft Windows"') DO echo %%i
+FOR /F "tokens=5" %%i IN ('systeminfo 2^>Nul ^| findstr /R /C:"Microsoft Windows"') DO echo %%i
 
 rem =========
 
