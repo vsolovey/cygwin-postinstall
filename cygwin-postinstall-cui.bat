@@ -14,7 +14,7 @@ SET BEGIN_DESCR=Изменения затронут только текущего пользователя. В скрипт можно 
 SET BEGIN="Действия: [R]Запустить настройку, [C]Отменить: "
 
 SET CYG_TITLE=1. Директория установки cygwin.
-SET CYG_DESCR=Отсутствует путь к cygwin. Добавьте его, или будет использовано значение по умолчанию "%LOCAL_CYGWIN%".
+SET CYG_DESCR=Не указан путь к месту установки cygwin. Укажите его, или будет использован 
 SET CYG_MK_PATH="Путь к cygwin: "
 SET CYG_MK="Действия: [A]Добавить, [S]Пропустить: "
 
@@ -50,15 +50,38 @@ IF /I NOT "x%choice%"=="xR" GOTO begin
 rem ------------------------------------
 
 rem ------------------------------------
+rem название ОС. От ОС зависит, в частности, вывод недокоманды reg.
+rem set OS_NAME=7
+echo %OS_TITLE%
+FOR /F "tokens=5" %%i IN ('systeminfo 2^>Nul ^| findstr /R /C:"Windows"') DO SET OS_NAME=%%i
+echo Windows Name: %OS_NAME%
+
+rem количество пропускаемых строк в выводе недокоманды reg.
+IF "x%OS_NAME%"=="x10" (
+	SET REG_SKIP=2
+)
+IF "x%OS_NAME%"=="x7" (
+	SET REG_SKIP=2
+)
+IF "x%OS_NAME%"=="xXP" (
+	SET REG_SKIP=4
+)
+rem ------------------------------------
+
+
+rem ------------------------------------
 rem инициализируем переменные
 rem положение cygwin. Если не задано в командной строке, то берётся значение по умолчанию
 IF NOT "x%1"=="x" (
 	SET LOCAL_CYGWIN=%1
 ) ELSE (
+	FOR /f "skip=%REG_SKIP% tokens=2*" %%i IN ('reg query HKCU\Environment /v CYGWIN_HOME 2^>Nul') DO SET REG_VAL=%%j
+	IF NOT "x!REG_VAL!"=="x" (
+		SET LOCAL_CYGWIN=!REG_VAL!
+	)
 	echo %CYG_TITLE%
-	echo %CYG_DESCR%
+	echo %CYG_DESCR% "!LOCAL_CYGWIN!"
 	:begin_cyg
-	echo choice: %choice%
 	SET /P choice=%CYG_MK%
 	IF /I "x!choice!"=="xS" GOTO end_cyg
 	IF /I NOT "x!choice!"=="xA" GOTO begin_cyg
@@ -68,23 +91,6 @@ IF NOT "x%1"=="x" (
 :end_cyg
 echo cygwin root: %LOCAL_CYGWIN%
 rem ------------------------------------
-
-rem ------------------------------------
-rem название ОС. От ОС зависит, в частности, вывод недокоманды reg.
-rem set OS_NAME=7
-echo %OS_TITLE%
-FOR /F "tokens=5" %%i IN ('systeminfo 2^>Nul ^| findstr /R /C:"Microsoft Windows"') DO SET OS_NAME=%%i
-echo Windows Name: %OS_NAME%
-
-rem количество пропускаемых строк в выводе недокоманды reg.
-IF "x%OS_NAME%"=="x7" (
-	SET REG_SKIP=2
-)
-IF "x%OS_NAME%"=="xXP" (
-	SET REG_SKIP=4
-)
-rem ------------------------------------
-
 
 rem ------------------------------------
 rem добавление cygwin в путь
