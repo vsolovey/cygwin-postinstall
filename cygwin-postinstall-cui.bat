@@ -36,6 +36,11 @@ SET MNT_TITLE=4. Логические диски.
 SET MNT_DESCR=Завести ссылки в /mnt для логических дисков
 SET MNT_MK="Действия: Для [E]существующих, Для [A]всех букв алфавита, [S]Пропустить: "
 
+SET CHANGES=Запрошенные изменения.
+
+SET END_TITLE=0. Послеустановочная настройка Cygwin.
+SET END_DESCR=Сохранить изменения?
+SET END="Действия: [Y]Да/[N]Нет: "
 
 rem ------------------------------------
 rem  command line options
@@ -122,20 +127,7 @@ IF "x%REG_VAL%"=="x" (
 	call mv --help >Nul 2>&1
 	IF NOT ERRORLEVEL 1 GOTO err_env
 
-	reg add HKCU\Environment /v CYGWIN_HOME /t REG_EXPAND_SZ /d %LOCAL_CYGWIN% >Nul
-	echo CYGWIN_HOME создана
-	
-	reg add HKCU\Environment /v CYGWIN_PATH /t REG_EXPAND_SZ /d %%CYGWIN_HOME%%\bin;%%CYGWIN_HOME%%\usr\local\bin;%%CYGWIN_HOME%%\usr\ssl\certs >Nul
-	echo CYGWIN_PATH создана
-
-	FOR /f "skip=2 tokens=2*" %%i IN ('reg query HKCU\Environment /v PATH 2^>Nul') DO SET REG_VAL=%%j
-	IF "x!REG_VAL!"=="x" (
-		reg add HKCU\Environment /v PATH /t REG_EXPAND_SZ /d %%CYGWIN_PATH%% /f >Nul
-	) ELSE (
-		reg add HKCU\Environment /v PATH /t REG_EXPAND_SZ /d !REG_VAL!;%%CYGWIN_PATH%% /f >Nul
-	)
-	echo пути прописаны
-
+	SET ENV_UPD=Yes
 ) ELSE (
 	echo %ENV_WARN2%
 )
@@ -167,12 +159,11 @@ IF EXIST %LOCAL_CYGWIN%\home\%USERNAME% (
 	:begin_home_warn
 	SET /P choice=%HOME_MK1%
 	IF /I "x!choice!"=="xD" (
-		!BASH! -c " [ -L %USR_HOME% ] && rm -f %USR_HOME% || rm -rf %USR_HOME% ; "
-		IF ERRORLEVEL 1 echo error
+		SET HOME_UPD=Rm
 		GOTO mk_home
 	)
 	IF /I "x!choice!"=="xR" (
-		!BASH! -c "mv -f %USR_HOME% %USR_HOME%-`date \+\"%%s\"` "
+		SET HOME_UPD=Mv
 		GOTO mk_home
 	)
 	IF /I NOT "x!choice!"=="xS" (
@@ -180,11 +171,11 @@ IF EXIST %LOCAL_CYGWIN%\home\%USERNAME% (
 	) ELSE (
 		GOTO end_home
 	)
+) ELSE (
+	SET HOME_UPD=New
 )
 
 :mk_home
-!BASH! -c 'ln -s "${HOME}/" /home/'
-reg add HKCU\Environment /v HOME /t REG_EXPAND_SZ /d %%USERPROFILE%% /f >Nul
 
 :end_home
 rem ------------------------------------
@@ -197,11 +188,11 @@ echo %MNT_DESCR%
 :begin_mnt
 SET /P choice=%MNT_MK%
 IF /I "x%choice%"=="xE" (
-	!BASH! -c "mkdir -p /mnt; ln -s /cygdrive/* /mnt/"
+	SET MNT_UPD=E
 	GOTO end_mnt
 )
 IF /I "x%choice%"=="xA" (
-	!BASH! -c "mkdir -p /mnt; ln -s /cygdrive/{c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z} /mnt/"
+	SET MNT_UPD=A
 	GOTO end_mnt
 )
 IF /I "x%choice%"=="xS" (
@@ -212,6 +203,127 @@ IF /I "x%choice%"=="xS" (
 
 :end_mnt
 rem ------------------------------------
+
+echo =====================================================
+echo %CHANGES%
+echo -----------------------------------------------------
+
+IF "x!ENV_UPD!"=="xYes" (
+	echo Переменные окружения:
+	rem SET MY_OUT=CYGWIN_HOME=!LOCAL_CYGWIN!
+	echo 	Добавить CYGWIN_HOME=%LOCAL_CYGWIN%
+	echo 	Добавить CYGWIN_PATH=%%CYGWIN_HOME%%\bin;%%CYGWIN_HOME%%\usr\local\bin;%%CYGWIN_HOME%%\usr\ssl\certs
+	FOR /f "skip=2 tokens=2*" %%i IN ('reg query HKCU\Environment /v PATH 2^>Nul') DO SET REG_VAL=%%j
+	IF "x!REG_VAL!"=="x" (
+		SET MY_OUT=PATH=%CYGWIN_PATH%
+		echo 	Добавить PATH=%CYGWIN_PATH%
+	) ELSE (
+		SET MY_OUT=PATH=!REG_VAL!%%CYGWIN_PATH%%
+		echo 	Добавить PATH=!REG_VAL!%%CYGWIN_PATH%%
+	)
+	IF NOT "x!HOME_UPD!"=="x" (
+		echo 	Добавить HOME=%%USERPROFILE%%
+	)
+) ELSE (
+	IF NOT "x!HOME_UPD!"=="x" (
+		echo Переменные окружения:
+		echo 	Добавить HOME=%%USERPROFILE%%
+	)
+)
+
+IF "x!HOME_UPD!"=="xNew" (
+	echo Домашняя директория:
+	echo 	Создать символьную ссылку [%USR_HOME%], указывающую на [%HOME%]
+)
+IF "x!HOME_UPD!"=="xRm" (
+	echo Домашняя директория:
+	rem Проверяем, чем является сущенствующая домашняя директория: ссылкой или директорией
+	!BASH! -c " [ -L %USR_HOME% ] || return_error_to_cmd " >Nul 2>&1
+	IF ERRORLEVEL 1 GOTO home_upd_dir
+	echo 	Удалить символьную ссылку [%USR_HOME%]
+	GOTO home_upd_end
+	:home_upd_dir
+	echo 	Удалить директорию [%USR_HOME%] со всем её содержимым
+	:home_upd_end
+	echo 	Создать символьную ссылку [%USR_HOME%], указывающую на [%HOME%]
+)
+IF "x!HOME_UPD!"=="xMv" (
+	echo Домашняя директория:
+	echo 	Переименовать [%USR_HOME%] в
+	!BASH! -c 'echo -e "\\\\t\\\\t[%USR_HOME%-`date \+\"%%s\"`]" '
+	echo 	Создать символьную ссылку [%USR_HOME%], указывающую на [%HOME%]
+)
+
+IF "x!MNT_UPD!"=="xE" (
+	echo Логические диски:
+	echo Добавить
+	!BASH! -c 'ls /cygdrive/ | sed -e "s/.*/\/mnt\/\0/"'
+)
+IF "x!MNT_UPD!"=="xA" (
+	echo Логические диски:
+	echo Добавить
+	!BASH! -c 'echo cdefghijklmnopqrstuvwxyz | sed -e "s/./\/mnt\/\0\n/g"'
+)
+echo =====================================================
+
+echo %END_TITLE%
+echo %END_DESCR%
+:begin_end
+SET /P choice=%END%
+IF /I "x%choice%"=="xY" GOTO commit
+IF /I NOT "x%choice%"=="xN" GOTO begin_end
+
+GOTO end
+
+:commit
+
+IF "x!ENV_UPD!"=="xYes" (
+	reg add HKCU\Environment /v CYGWIN_HOME /t REG_EXPAND_SZ /d %LOCAL_CYGWIN% >Nul
+	echo Переменная CYGWIN_HOME создана
+
+	reg add HKCU\Environment /v CYGWIN_PATH /t REG_EXPAND_SZ /d %%CYGWIN_HOME%%\bin;%%CYGWIN_HOME%%\usr\local\bin;%%CYGWIN_HOME%%\usr\ssl\certs >Nul
+	echo Переменная CYGWIN_PATH создана
+
+	FOR /f "skip=2 tokens=2*" %%i IN ('reg query HKCU\Environment /v PATH 2^>Nul') DO SET REG_VAL=%%j
+	IF "x!REG_VAL!"=="x" (
+		reg add HKCU\Environment /v PATH /t REG_EXPAND_SZ /d %%CYGWIN_PATH%% /f >Nul
+		echo Переменная PATH создана
+	) ELSE (
+		reg add HKCU\Environment /v PATH /t REG_EXPAND_SZ /d !REG_VAL!;%%CYGWIN_PATH%% /f >Nul
+		echo Переменная PATH обновлена
+	)
+)
+IF NOT "x!HOME_UPD!"=="x" (
+	reg add HKCU\Environment /v HOME /t REG_EXPAND_SZ /d %%USERPROFILE%% /f >Nul
+	echo Переменная HOME создана
+)
+
+IF "x!HOME_UPD!"=="xNew" (
+	!BASH! -c 'ln -s "${HOME}/" /home/'
+	echo Ссылка на домашнюю директорию создана
+)
+IF "x!HOME_UPD!"=="xRm" (
+	!BASH! -c " [ -L %USR_HOME% ] && rm -f %USR_HOME% || rm -rf %USR_HOME% ; "
+	IF ERRORLEVEL 1 echo error rm home dir
+	echo Удаление домашней директории завершено
+	!BASH! -c 'ln -s "${HOME}/" /home/'
+	echo Ссылка на домашнюю директорию создана
+)
+IF "x!HOME_UPD!"=="xMv" (
+	!BASH! -c "mv -f %USR_HOME% %USR_HOME%-`date \+\"%%s\"` "
+	echo Переименование домашней директории завершено
+	!BASH! -c 'ln -s "${HOME}/" /home/'
+	echo Ссылка на домашнюю директорию создана
+)
+
+IF "x!MNT_UPD!"=="xE" (
+	!BASH! -c "mkdir -p /mnt; ln -s /cygdrive/* /mnt/"
+	echo Диски добавлены
+)
+IF "x!MNT_UPD!"=="xA" (
+	!BASH! -c "mkdir -p /mnt; ln -s /cygdrive/{c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z} /mnt/"
+	echo Диски добавлены
+)
 
 set PATH=%tmp_path%
 set HOME=%tmp_home%
