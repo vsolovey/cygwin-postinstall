@@ -71,7 +71,8 @@ rem ------------------------------------
 
 rem ------------------------------------
 rem инициализируем переменные
-rem положение cygwin. Если не задано в командной строке, то берётся значение по умолчанию
+rem положение cygwin.
+rem Если не задано в командной строке, то берётся из реестра (если есть) или по умолчанию
 IF NOT "x%1"=="x" (
 	SET LOCAL_CYGWIN=%1
 ) ELSE (
@@ -90,6 +91,7 @@ IF NOT "x%1"=="x" (
 )
 :end_cyg
 echo cygwin root: %LOCAL_CYGWIN%
+SET BASH=!LOCAL_CYGWIN!\bin\bash
 rem ------------------------------------
 
 rem ------------------------------------
@@ -165,12 +167,12 @@ IF EXIST %LOCAL_CYGWIN%\home\%USERNAME% (
 	:begin_home_warn
 	SET /P choice=%HOME_MK1%
 	IF /I "x!choice!"=="xD" (
-		%BASH% -c " [ -L %USR_HOME% ] && rm -f %USR_HOME% || rm -rf %USR_HOME% ; "
+		!BASH! -c " [ -L %USR_HOME% ] && rm -f %USR_HOME% || rm -rf %USR_HOME% ; "
 		IF ERRORLEVEL 1 echo error
 		GOTO mk_home
 	)
 	IF /I "x!choice!"=="xR" (
-		%BASH% -c "mv -f %USR_HOME% %USR_HOME%-`date \+\"%%s\"` "
+		!BASH! -c "mv -f %USR_HOME% %USR_HOME%-`date \+\"%%s\"` "
 		GOTO mk_home
 	)
 	IF /I NOT "x!choice!"=="xS" (
@@ -181,7 +183,7 @@ IF EXIST %LOCAL_CYGWIN%\home\%USERNAME% (
 )
 
 :mk_home
-%BASH% -c 'ln -s "${HOME}/" /home/'
+!BASH! -c 'ln -s "${HOME}/" /home/'
 reg add HKCU\Environment /v HOME /t REG_EXPAND_SZ /d %%USERPROFILE%% /f >Nul
 
 :end_home
@@ -189,17 +191,17 @@ rem ------------------------------------
 
 
 rem ------------------------------------
-rem добавить ссылки на диски в /mnt
+rem добавление ссылок на диски в /mnt
 echo %MNT_TITLE%
 echo %MNT_DESCR%
 :begin_mnt
 SET /P choice=%MNT_MK%
 IF /I "x%choice%"=="xE" (
-	%BASH% -c "mkdir -p /mnt; cd /mnt; ln -s /cygdrive/* ."
+	!BASH! -c "mkdir -p /mnt; ln -s /cygdrive/* /mnt/"
 	GOTO end_mnt
 )
 IF /I "x%choice%"=="xA" (
-	%BASH% -c "mkdir -p /mnt; cd /mnt; ln -s /cygdrive/{c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z} ."
+	!BASH! -c "mkdir -p /mnt; ln -s /cygdrive/{c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z} /mnt/"
 	GOTO end_mnt
 )
 IF /I "x%choice%"=="xS" (
